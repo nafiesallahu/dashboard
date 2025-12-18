@@ -12,11 +12,13 @@ function WidgetFrameImpl({ title, onHide, children }: WidgetFrameProps) {
   return (
     <section className="flex h-full flex-col overflow-hidden rounded-xl border bg-white shadow-sm">
       <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
-        <div className="drag-handle inline-flex cursor-move select-none items-center gap-2 rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
-          Drag
-        </div>
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="drag-handle inline-flex cursor-move select-none items-center gap-2 rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
+            Drag
+          </div>
 
-        <div className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900">{title}</div>
+          <div className="min-w-0 truncate text-sm font-semibold text-gray-900">{title}</div>
+        </div>
 
         <button
           type="button"

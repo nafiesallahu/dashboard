@@ -19,19 +19,14 @@ export default function App() {
   const discardDraft = useDashboardStore((s) => s.discardDraft);
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
+    <div className="min-h-screen bg-slate-50 text-gray-900">
       <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-sm font-semibold text-white">
-              A
-            </div>
-            <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
-          </div>
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
+          <h1 className="text-lg font-semibold tracking-tight text-gray-900 sm:text-xl">Dashboard</h1>
 
           <div className="flex items-center gap-2">
             {isDirty ? (
-              <span className="mr-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">
+              <span className="mr-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
                 Unsaved changes
               </span>
             ) : null}
@@ -59,7 +54,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-6">
+      <main className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">
         <DashboardPage />
       </main>
     </div>

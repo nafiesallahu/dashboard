@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import { Responsive, WidthProvider } from 'react-grid-layout';
 
 import { useDashboardStore } from '../../store/dashboardStore';
@@ -15,32 +15,45 @@ function isBreakpoint(value: string): value is Breakpoint {
 }
 
 export function DashboardGrid() {
-  const draftLayouts = useDashboardStore((s) => s.dashboard.draftLayouts);
+  /**
+   * React 19 + Zustand stability fix:
+   * - Select stable object reference (widgetsById) instead of deriving arrays inline.
+   * - Derive visibleIds in useMemo to avoid selector instability ("getSnapshot should be cached").
+   */
   const widgetsById = useDashboardStore((s) => s.dashboard.widgetsById);
+  const draftLayouts = useDashboardStore((s) => s.dashboard.draftLayouts);
   const setDraftLayouts = useDashboardStore((s) => s.setDraftLayouts);
 
-  const [activeBreakpoint, setActiveBreakpoint] = useState<Breakpoint>('lg');
+  const activeBreakpointRef = useRef<Breakpoint>('lg');
+
+  // Derive visibleIds from stable widgetsById reference
+  const visibleIds = useMemo(
+    () =>
+      Object.values(widgetsById)
+        .filter((w) => w.visible)
+        .map((w) => w.id)
+        .sort(),
+    [widgetsById],
+  );
+
+  const visibleSet = useMemo(() => new Set(visibleIds), [visibleIds]);
 
   const visibleLayouts = useMemo((): DashboardLayouts => {
     const filterItems = (items: GridLayoutItem[] | undefined) =>
-      (items ?? []).filter((item) => {
-        const widget = widgetsById[item.i];
-        return Boolean(widget && widget.visible);
-      });
+      // Clone items so RGL can mutate without mutating Zustand state by reference.
+      (items ?? [])
+        .filter((item) => visibleSet.has(item.i))
+        .map((item) => ({ ...item }));
 
     return {
       lg: filterItems(draftLayouts.lg),
       md: filterItems(draftLayouts.md),
       sm: filterItems(draftLayouts.sm),
     };
-  }, [draftLayouts.lg, draftLayouts.md, draftLayouts.sm, widgetsById]);
-
-  const renderedIds = useMemo(() => {
-    return (visibleLayouts[activeBreakpoint] ?? []).map((l) => l.i);
-  }, [activeBreakpoint, visibleLayouts]);
+  }, [draftLayouts.lg, draftLayouts.md, draftLayouts.sm, visibleSet]);
 
   return (
-    <div className="rounded-xl bg-slate-50 p-4">
+    <div className="min-h-0">
       <ResponsiveGridLayout
         className="layout"
         layouts={visibleLayouts}
@@ -51,17 +64,19 @@ export function DashboardGrid() {
         containerPadding={[0, 0]}
         draggableHandle=".drag-handle"
         onBreakpointChange={(bp) => {
-          if (isBreakpoint(bp)) setActiveBreakpoint(bp);
+          if (!isBreakpoint(bp)) return;
+          activeBreakpointRef.current = bp;
         }}
-        onDragStop={(layout, _oldItem, _newItem) => {
-          setDraftLayouts(activeBreakpoint, layout);
+        onDragStop={(layout) => {
+          // Important: only commit on stop events (avoid dispatching on every mouse move)
+          setDraftLayouts(activeBreakpointRef.current, layout);
         }}
-        onResizeStop={(layout, _oldItem, _newItem) => {
-          setDraftLayouts(activeBreakpoint, layout);
+        onResizeStop={(layout) => {
+          setDraftLayouts(activeBreakpointRef.current, layout);
         }}
       >
-        {renderedIds.map((id) => (
-          <div key={id} className="h-full">
+        {visibleIds.map((id) => (
+          <div key={id} className="h-full min-h-0">
             <WidgetRenderer id={id} />
           </div>
         ))}

@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 import { useDashboardStore, useWidgetById } from '../../store/dashboardStore';
 import type { ChartWidgetConfig, KpiWidgetConfig, TableWidgetConfig } from '../../store/types';
 
@@ -12,7 +14,7 @@ const registry = {
   table: TableWidget,
 } as const;
 
-export function WidgetRenderer({ id }: { id: string }) {
+function WidgetRendererImpl({ id }: { id: string }) {
   const widget = useWidgetById(id);
   const setWidgetVisibility = useDashboardStore((s) => s.setWidgetVisibility);
 
@@ -50,5 +52,7 @@ export function WidgetRenderer({ id }: { id: string }) {
     </WidgetFrame>
   );
 }
+
+export const WidgetRenderer = memo(WidgetRendererImpl);
 
 

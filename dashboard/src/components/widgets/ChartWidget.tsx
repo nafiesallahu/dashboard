@@ -166,7 +166,8 @@ function ChartWidgetImpl({ id, settings }: ChartWidgetProps) {
 
   if (isLoading) return <Skeleton />;
   if (isError || !data) return <ErrorState />;
-  if (series.length === 0) return <div className="text-sm text-gray-500">No data</div>;
+  if (series.length === 0)
+    return <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm text-slate-600">No data</div>;
 
   return (
     <div className="flex h-full min-w-0 flex-col">

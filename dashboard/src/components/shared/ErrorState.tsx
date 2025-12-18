@@ -1,6 +1,6 @@
 export function ErrorState() {
   return (
-    <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+    <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
       Error loading data
     </div>
   );
