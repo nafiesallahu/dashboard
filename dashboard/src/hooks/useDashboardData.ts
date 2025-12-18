@@ -1,12 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
+import type { FiltersState } from '../store/types';
 
-import { fetchDashboardData } from '../services/mockApi';
+import { getDashboardData } from '../services/mockApi';
 
-export function useDashboardData() {
-  // TODO: accept filters as params and include them in the query key.
+export function useDashboardData(filters: FiltersState) {
   return useQuery({
-    queryKey: ['dashboard'],
-    queryFn: fetchDashboardData,
+    queryKey: ['dashboard', filters.dateRange, filters.region, filters.dataset],
+    queryFn: () => getDashboardData(filters),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
 }
 
