@@ -1,0 +1,12 @@
+{
+  "name": "dashboard",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix dashboard run dev -- --host 127.0.0.1",
+    "build": "npm --prefix dashboard run build",
+    "preview": "npm --prefix dashboard run preview",
+    "lint": "npm --prefix dashboard run lint"
+  }
+}
+
+
