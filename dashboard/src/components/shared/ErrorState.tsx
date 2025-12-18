@@ -1,6 +1,9 @@
 export function ErrorState() {
-  // TODO: shared error UI for failed data loads or widget render errors.
-  return <div className="text-sm text-gray-500">ErrorState</div>;
+  return (
+    <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+      Error loading data
+    </div>
+  );
 }
 
 

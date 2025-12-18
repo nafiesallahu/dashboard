@@ -14,14 +14,25 @@ import type {
 export type StoreState = {
   filters: FiltersState;
   dashboard: DashboardState;
+  isDirty: boolean;
 
   // actions
   setFilter: (patch: Partial<FiltersState>) => void;
-  setLayouts: (bp: Breakpoint, layout: GridLayoutItem[]) => void;
+  setDraftLayouts: (bp: Breakpoint, layout: GridLayoutItem[]) => void;
+  discardDraft: () => void;
   toggleWidgetVisibility: (id: string) => void;
+  setWidgetVisibility: (id: string, visible: boolean) => void;
   updateWidgetSettings: (payload: UpdateWidgetSettingsPayload) => void;
   resetToDefaults: () => void;
   saveNow: () => void;
+};
+
+type SavedDashboardSnapshot = Pick<DashboardState, 'schemaVersion' | 'layouts' | 'widgetsById'>;
+
+let lastSavedDashboard: SavedDashboardSnapshot = {
+  schemaVersion: DEFAULT_DASHBOARD_STATE.schemaVersion,
+  layouts: DEFAULT_DASHBOARD_STATE.layouts,
+  widgetsById: DEFAULT_DASHBOARD_STATE.widgetsById,
 };
 
 function initState(): Pick<StoreState, 'filters' | 'dashboard'> {
@@ -29,117 +40,162 @@ function initState(): Pick<StoreState, 'filters' | 'dashboard'> {
 
   const filters: FiltersState = persisted?.filters ? { ...DEFAULT_FILTERS, ...persisted.filters } : DEFAULT_FILTERS;
 
-  let dashboard: DashboardState = DEFAULT_DASHBOARD_STATE;
-  if (persisted?.dashboard) {
-    dashboard = {
-      schemaVersion: 1,
-      layouts: persisted.dashboard.layouts ?? DEFAULT_DASHBOARD_STATE.layouts,
-      widgetsById: {
-        ...DEFAULT_DASHBOARD_STATE.widgetsById,
-        ...(persisted.dashboard.widgetsById ?? {}),
-      },
-    };
-  }
+  const savedLayouts = persisted?.dashboard?.layouts ?? DEFAULT_DASHBOARD_STATE.layouts;
+  const savedWidgetsById = {
+    ...DEFAULT_DASHBOARD_STATE.widgetsById,
+    ...(persisted?.dashboard?.widgetsById ?? {}),
+  };
+
+  lastSavedDashboard = {
+    schemaVersion: 1,
+    layouts: savedLayouts,
+    widgetsById: savedWidgetsById,
+  };
+
+  const dashboard: DashboardState = {
+    schemaVersion: 1,
+    layouts: savedLayouts,
+    draftLayouts: savedLayouts,
+    widgetsById: savedWidgetsById,
+  };
 
   return { filters, dashboard };
 }
 
 export const useDashboardStore = create<StoreState>()(
   subscribeWithSelector((set, get) => {
-  const initial = initState();
+    const initial = initState();
 
-  return {
-    ...initial,
+    return {
+      ...initial,
+      isDirty: false,
 
-    setFilter: (patch) => set((s) => ({ filters: { ...s.filters, ...patch } })),
+      setFilter: (patch) => set((s) => ({ filters: { ...s.filters, ...patch } })),
 
-    setLayouts: (bp, layout) =>
-      set((s) => ({
-        dashboard: {
-          ...s.dashboard,
-          layouts: {
-            ...s.dashboard.layouts,
-            [bp]: layout,
-          },
-        },
-      })),
-
-    toggleWidgetVisibility: (id) =>
-      set((s) => {
-        const current = s.dashboard.widgetsById[id];
-        if (!current) return s;
-        return {
+      setDraftLayouts: (bp, layout) =>
+        set((s) => ({
+          isDirty: true,
           dashboard: {
             ...s.dashboard,
-            widgetsById: {
-              ...s.dashboard.widgetsById,
-              [id]: { ...current, visible: !current.visible },
+            draftLayouts: {
+              ...s.dashboard.draftLayouts,
+              [bp]: layout,
             },
           },
-        };
-      }),
+        })),
 
-    updateWidgetSettings: (payload) =>
-      set((s) => {
-        const widget = s.dashboard.widgetsById[payload.id];
-        if (!widget) return s;
+      discardDraft: () =>
+        set((s) => ({
+          isDirty: false,
+          dashboard: {
+            ...s.dashboard,
+            draftLayouts: lastSavedDashboard.layouts,
+            widgetsById: lastSavedDashboard.widgetsById,
+          },
+        })),
 
-        if (widget.type !== payload.type) {
-          if (import.meta.env.DEV) {
-            // eslint-disable-next-line no-console
-            console.warn('updateWidgetSettings ignored due to type mismatch', { widget, payload });
+      setWidgetVisibility: (id, visible) =>
+        set((s) => {
+          const current = s.dashboard.widgetsById[id];
+          if (!current) return s;
+          if (current.visible === visible) return s;
+          return {
+            isDirty: true,
+            dashboard: {
+              ...s.dashboard,
+              widgetsById: {
+                ...s.dashboard.widgetsById,
+                [id]: { ...current, visible },
+              },
+            },
+          };
+        }),
+
+      toggleWidgetVisibility: (id) => {
+        const current = get().dashboard.widgetsById[id];
+        if (!current) return;
+        get().setWidgetVisibility(id, !current.visible);
+      },
+
+      updateWidgetSettings: (payload) =>
+        set((s) => {
+          const widget = s.dashboard.widgetsById[payload.id];
+          if (!widget) return s;
+
+          if (widget.type !== payload.type) {
+            if (import.meta.env.DEV) {
+              // eslint-disable-next-line no-console
+              console.warn('updateWidgetSettings ignored due to type mismatch', { widget, payload });
+            }
+            return s;
           }
-          return s;
-        }
 
-        const nextWidget =
-          payload.type === 'kpi' && widget.type === 'kpi'
-            ? { ...widget, settings: { ...widget.settings, ...payload.patch } }
-            : payload.type === 'chart' && widget.type === 'chart'
+          const nextWidget =
+            payload.type === 'kpi' && widget.type === 'kpi'
               ? { ...widget, settings: { ...widget.settings, ...payload.patch } }
-              : payload.type === 'table' && widget.type === 'table'
+              : payload.type === 'chart' && widget.type === 'chart'
                 ? { ...widget, settings: { ...widget.settings, ...payload.patch } }
-                : widget;
+                : payload.type === 'table' && widget.type === 'table'
+                  ? { ...widget, settings: { ...widget.settings, ...payload.patch } }
+                  : widget;
 
-        return {
-          dashboard: {
-            ...s.dashboard,
-            widgetsById: {
-              ...s.dashboard.widgetsById,
-              [payload.id]: nextWidget,
+          return {
+            isDirty: true,
+            dashboard: {
+              ...s.dashboard,
+              widgetsById: {
+                ...s.dashboard.widgetsById,
+                [payload.id]: nextWidget,
+              },
             },
-          },
+          };
+        }),
+
+      resetToDefaults: () => {
+        lastSavedDashboard = {
+          schemaVersion: DEFAULT_DASHBOARD_STATE.schemaVersion,
+          layouts: DEFAULT_DASHBOARD_STATE.layouts,
+          widgetsById: DEFAULT_DASHBOARD_STATE.widgetsById,
         };
-      }),
+        set({ filters: DEFAULT_FILTERS, dashboard: DEFAULT_DASHBOARD_STATE, isDirty: false });
+        get().saveNow();
+      },
 
-    resetToDefaults: () => {
-      set({ filters: DEFAULT_FILTERS, dashboard: DEFAULT_DASHBOARD_STATE });
-      get().saveNow();
-    },
+      saveNow: () => {
+        const { filters, dashboard } = get();
+        const committed: DashboardState = {
+          ...dashboard,
+          layouts: dashboard.draftLayouts,
+        };
 
-    saveNow: () => {
-      const { filters, dashboard } = get();
-      savePersisted({ filters, dashboard });
-    },
-  };
+        lastSavedDashboard = {
+          schemaVersion: committed.schemaVersion,
+          layouts: committed.layouts,
+          widgetsById: committed.widgetsById,
+        };
+
+        set({ dashboard: committed, isDirty: false });
+        savePersisted({ filters, dashboard: lastSavedDashboard });
+      },
+    };
   }),
 );
 
-// Persistence wiring (debounced)
+// Persistence wiring (debounced) — filters only (dashboard persists only on Save Layout)
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
-function scheduleSave() {
+function scheduleSaveFilters() {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    const { filters, dashboard } = useDashboardStore.getState();
-    savePersisted({ filters, dashboard });
+    const { filters } = useDashboardStore.getState();
+    savePersisted({ filters, dashboard: lastSavedDashboard });
   }, 400);
 }
 
 useDashboardStore.subscribe(
-  (s) => ({ filters: s.filters, dashboard: s.dashboard }),
+  (s) => s.filters,
   () => {
-    scheduleSave();
+    scheduleSaveFilters();
   },
 );
 
@@ -147,6 +203,6 @@ useDashboardStore.subscribe(
 export const useFilters = () => useDashboardStore((s) => s.filters);
 export const useFilterActions = () => useDashboardStore((s) => s.setFilter);
 export const useWidgetById = (id: string) => useDashboardStore((s) => s.dashboard.widgetsById[id]);
-export const useLayouts = () => useDashboardStore((s) => s.dashboard.layouts);
+export const useLayouts = () => useDashboardStore((s) => s.dashboard.draftLayouts);
 
 

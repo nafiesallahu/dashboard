@@ -61,6 +61,7 @@ export const DEFAULT_LAYOUTS: DashboardLayouts = {
 export const DEFAULT_DASHBOARD_STATE: DashboardState = {
   schemaVersion: 1,
   layouts: DEFAULT_LAYOUTS,
+  draftLayouts: DEFAULT_LAYOUTS,
   widgetsById: DEFAULT_WIDGETS_BY_ID,
 };
 

@@ -47,6 +47,7 @@ export type DashboardLayouts = Partial<Record<Breakpoint, GridLayoutItem[]>>;
 export type DashboardState = {
   schemaVersion: number;
   layouts: DashboardLayouts;
+  draftLayouts: DashboardLayouts;
   widgetsById: Record<string, WidgetConfig>;
 };
 
