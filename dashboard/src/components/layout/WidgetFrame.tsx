@@ -10,7 +10,7 @@ export type WidgetFrameProps = {
 
 function WidgetFrameImpl({ title, onHide, children }: WidgetFrameProps) {
   return (
-    <section className="h-full overflow-hidden rounded-xl border bg-white">
+    <section className="flex h-full flex-col overflow-hidden rounded-xl border bg-white shadow-sm">
       <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
         <div className="drag-handle inline-flex cursor-move select-none items-center gap-2 rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
           Drag
@@ -27,7 +27,7 @@ function WidgetFrameImpl({ title, onHide, children }: WidgetFrameProps) {
         </button>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col p-4">{children}</div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col p-4">{children}</div>
     </section>
   );
 }
