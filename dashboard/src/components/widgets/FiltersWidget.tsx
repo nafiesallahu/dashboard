@@ -8,9 +8,9 @@ export type FiltersWidgetProps = {
   id: string;
 };
 
-function FiltersWidgetImpl(_: FiltersWidgetProps) {
+function FiltersWidgetImpl({ id }: FiltersWidgetProps) {
   return (
-    <div className="flex h-full min-w-0 flex-col">
+    <div className="flex h-full min-w-0 flex-col" data-widget-id={id}>
       <div className="flex flex-wrap items-center gap-3">
         <DatasetFilter />
         <DateRangeFilter />
