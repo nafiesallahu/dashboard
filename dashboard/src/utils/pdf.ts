@@ -20,6 +20,8 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
   }>;
   rows: T[];
 }): Uint8Array {
+  // This is a deliberately lightweight PDF generator implemented directly with
+  // PDF objects/content streams (no external PDF dependency).
   const pageW = 595; 
   const pageH = 842;
 
@@ -121,6 +123,7 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
     const out: string[] = [];
     let rest = text;
 
+    // Prefer breaking on "nice" delimiters for common fields (email, names, URLs).
     const breakChars = new Set([' ', '/', '-', '_', '@', '.']);
     while (rest.length > maxChars) {
       let cut = maxChars;

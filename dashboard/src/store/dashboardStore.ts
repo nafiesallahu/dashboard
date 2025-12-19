@@ -29,6 +29,9 @@ export type StoreState = {
 
 type SavedDashboardSnapshot = Pick<DashboardState, 'schemaVersion' | 'layouts' | 'widgetsById'>;
 
+// We keep an explicit "last saved" snapshot separate from the live store state.
+// This is intentional UX: users can freely drag/resize/toggle widgets (draft),
+// then either persist via Save Layout or revert via Discard.
 let lastSavedDashboard: SavedDashboardSnapshot = {
   schemaVersion: DEFAULT_DASHBOARD_STATE.schemaVersion,
   layouts: DEFAULT_DASHBOARD_STATE.layouts,
@@ -52,6 +55,8 @@ function getDefaultFiltersItem(bp: Breakpoint): GridLayoutItem {
 
 function mergeLayoutsWithDefaults(saved: DashboardState['layouts']): DashboardState['layouts'] {
   return {
+    // Always ensure the global filters widget exists in each breakpoint layout.
+    // This guards against older persisted layouts or partial saves.
     lg: ensureLayoutHasItem(saved.lg, getDefaultFiltersItem('lg')),
     md: ensureLayoutHasItem(saved.md, getDefaultFiltersItem('md')),
     sm: ensureLayoutHasItem(saved.sm, getDefaultFiltersItem('sm')),
@@ -70,6 +75,8 @@ function applyDefaultSizeToLayout(bp: Breakpoint, layout: GridLayoutItem[] | und
 
   return ensured.map((item) => {
     if (item.i !== id) return item;
+    // When re-showing a widget, snap it back to its default size constraints so it
+    // doesn't reappear with a stale/tiny size from a previous layout.
     return {
       ...item,
       w: def.w,
@@ -85,6 +92,7 @@ function applyDefaultSizeToLayout(bp: Breakpoint, layout: GridLayoutItem[] | und
 function initState(): Pick<StoreState, 'filters' | 'dashboard'> {
   const persisted = loadPersisted();
 
+  // Merge persisted filters over defaults so adding new filter keys remains backwards compatible.
   const filters: FiltersState = persisted?.filters ? { ...DEFAULT_FILTERS, ...persisted.filters } : DEFAULT_FILTERS;
 
   const rawSavedLayouts = persisted?.dashboard?.layouts ?? DEFAULT_DASHBOARD_STATE.layouts;
@@ -137,6 +145,7 @@ export const useDashboardStore = create<StoreState>()(
           isDirty: false,
           dashboard: {
             ...s.dashboard,
+            // Discard restores the last persisted snapshot (not defaults).
             draftLayouts: lastSavedDashboard.layouts,
             widgetsById: lastSavedDashboard.widgetsById,
           },
@@ -222,6 +231,7 @@ export const useDashboardStore = create<StoreState>()(
 
       saveNow: () => {
         const { filters, dashboard } = get();
+        // "Save Layout" commits draft layouts into the saved layouts.
         const committed: DashboardState = {
           ...dashboard,
           layouts: dashboard.draftLayouts,
@@ -243,6 +253,7 @@ export const useDashboardStore = create<StoreState>()(
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function scheduleSaveFilters() {
   if (saveTimer) clearTimeout(saveTimer);
+  // Debounce filter persistence so fast typing / slider-like interactions don't spam localStorage.
   saveTimer = setTimeout(() => {
     saveTimer = null;
     const { filters } = useDashboardStore.getState();
