@@ -35,12 +35,65 @@ let lastSavedDashboard: SavedDashboardSnapshot = {
   widgetsById: DEFAULT_DASHBOARD_STATE.widgetsById,
 };
 
+function ensureLayoutHasItem(layout: GridLayoutItem[] | undefined, item: GridLayoutItem): GridLayoutItem[] {
+  const arr = (layout ?? []).slice();
+  const exists = arr.some((x) => x.i === item.i);
+  if (exists) return arr;
+  // Put new widgets at the bottom for existing saved layouts to avoid overlapping user placements.
+  return [...arr, { ...item, y: Number.POSITIVE_INFINITY }];
+}
+
+function getDefaultFiltersItem(bp: Breakpoint): GridLayoutItem {
+  const fromDefaults = (DEFAULT_DASHBOARD_STATE.layouts[bp] ?? []).find((x) => x.i === 'filters_global');
+  if (fromDefaults) return fromDefaults;
+  // Safe fallback (shouldn't happen unless defaults are edited incorrectly)
+  if (bp === 'lg') return { i: 'filters_global', x: 0, y: 0, w: 12, h: 3 } as GridLayoutItem;
+  if (bp === 'md') return { i: 'filters_global', x: 0, y: 0, w: 10, h: 3 } as GridLayoutItem;
+  return { i: 'filters_global', x: 0, y: 0, w: 6, h: 4 } as GridLayoutItem;
+}
+
+function mergeLayoutsWithDefaults(saved: DashboardState['layouts']): DashboardState['layouts'] {
+  return {
+    lg: ensureLayoutHasItem(saved.lg, getDefaultFiltersItem('lg')),
+    md: ensureLayoutHasItem(saved.md, getDefaultFiltersItem('md')),
+    sm: ensureLayoutHasItem(saved.sm, getDefaultFiltersItem('sm')),
+  };
+}
+
+function getDefaultLayoutItem(bp: Breakpoint, id: string): GridLayoutItem | undefined {
+  return (DEFAULT_DASHBOARD_STATE.layouts[bp] ?? []).find((x) => x.i === id);
+}
+
+function applyDefaultSizeToLayout(bp: Breakpoint, layout: GridLayoutItem[] | undefined, id: string): GridLayoutItem[] {
+  const def = getDefaultLayoutItem(bp, id);
+  if (!def) return (layout ?? []).slice();
+
+  // Ensure the item exists; if it's new for this saved layout, append at bottom to avoid overlaps.
+  const ensured = ensureLayoutHasItem(layout, { ...def, y: Number.POSITIVE_INFINITY });
+
+  // Reset size constraints to defaults, but keep the user's last position (x/y) if it already existed.
+  return ensured.map((item) => {
+    if (item.i !== id) return item;
+    return {
+      ...item,
+      w: def.w,
+      h: def.h,
+      minW: def.minW ?? item.minW,
+      minH: def.minH ?? item.minH,
+      maxW: def.maxW ?? item.maxW,
+      maxH: def.maxH ?? item.maxH,
+    };
+  });
+}
+
 function initState(): Pick<StoreState, 'filters' | 'dashboard'> {
   const persisted = loadPersisted();
 
   const filters: FiltersState = persisted?.filters ? { ...DEFAULT_FILTERS, ...persisted.filters } : DEFAULT_FILTERS;
 
-  const savedLayouts = persisted?.dashboard?.layouts ?? DEFAULT_DASHBOARD_STATE.layouts;
+  const rawSavedLayouts = persisted?.dashboard?.layouts ?? DEFAULT_DASHBOARD_STATE.layouts;
+  // Ensure new widgets introduced in later versions (e.g. filters widget) get a default size/placement.
+  const savedLayouts = mergeLayoutsWithDefaults(rawSavedLayouts);
   const savedWidgetsById = {
     ...DEFAULT_DASHBOARD_STATE.widgetsById,
     ...(persisted?.dashboard?.widgetsById ?? {}),
@@ -99,10 +152,22 @@ export const useDashboardStore = create<StoreState>()(
           const current = s.dashboard.widgetsById[id];
           if (!current) return s;
           if (current.visible === visible) return s;
+
+          // When a widget is re-shown, reset it to the default size (per breakpoint).
+          const nextDraftLayouts =
+            !current.visible && visible
+              ? {
+                  lg: applyDefaultSizeToLayout('lg', s.dashboard.draftLayouts.lg, id),
+                  md: applyDefaultSizeToLayout('md', s.dashboard.draftLayouts.md, id),
+                  sm: applyDefaultSizeToLayout('sm', s.dashboard.draftLayouts.sm, id),
+                }
+              : s.dashboard.draftLayouts;
+
           return {
             isDirty: true,
             dashboard: {
               ...s.dashboard,
+              draftLayouts: nextDraftLayouts,
               widgetsById: {
                 ...s.dashboard.widgetsById,
                 [id]: { ...current, visible },

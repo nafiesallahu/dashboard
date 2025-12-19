@@ -1,3 +1,4 @@
+import { DatasetFilter } from './DatasetFilter';
 import { useDashboardStore } from '../../store/dashboardStore';
 
 export function FiltersBar() {
@@ -7,17 +8,7 @@ export function FiltersBar() {
   return (
     <div className="rounded-xl border bg-white px-4 py-3 shadow-sm">
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm text-gray-600">
-          <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Dataset</span>
-          <select
-            className="h-9 rounded-md border bg-white px-3 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-            value={filters.dataset}
-            onChange={(e) => setFilter({ dataset: e.target.value as typeof filters.dataset })}
-          >
-            <option value="default">Default</option>
-            <option value="alt">Alt</option>
-          </select>
-        </label>
+        <DatasetFilter />
 
         <label className="flex items-center gap-2 text-sm text-gray-600">
           <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Range</span>

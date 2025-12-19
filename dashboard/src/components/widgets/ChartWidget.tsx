@@ -1,6 +1,6 @@
 import type { ChartSettings } from '../../store/types';
 
-import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import {
   Bar,
   BarChart,
@@ -18,7 +18,9 @@ import {
 } from 'recharts';
 
 import { useDashboardData } from '../../hooks/useDashboardData';
+import { useElementSize } from '../../hooks/useElementSize';
 import { useDashboardStore } from '../../store/dashboardStore';
+import { downloadCsv, toCsv } from '../../utils/csv';
 import { ErrorState } from '../shared/ErrorState';
 import { Skeleton } from '../shared/Skeleton';
 
@@ -29,7 +31,16 @@ export type ChartWidgetProps = {
 
 type TimePoint = { date: string; value: number };
 
-const COLORS = ['#4f46e5', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
+const PRIMARY_COLOR = '#5101a7';
+// Color palette for pie chart (only first slice uses PRIMARY_COLOR, others use these)
+const PIE_COLORS = [
+  '#06b6d4', // cyan
+  '#22c55e', // green
+  '#f59e0b', // amber
+  '#ef4444', // red
+  '#8b5cf6', // purple
+  '#ec4899', // pink
+];
 
 type PieSlice = { name: string; value: number };
 
@@ -42,52 +53,19 @@ function buildPieSlices(series: TimePoint[], topN = 6): PieSlice[] {
   return top.sort((a, b) => b.value - a.value);
 }
 
+function sanitizeFilenamePart(value: string): string {
+  // Keep it simple + consistent: replace whitespace with "_" and avoid weird filesystem characters.
+  return value
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
 function ChartWidgetImpl({ id, settings }: ChartWidgetProps) {
   const filters = useDashboardStore((s) => s.filters);
   const updateWidgetSettings = useDashboardStore((s) => s.updateWidgetSettings);
   const { data, isLoading, isError } = useDashboardData(filters);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  // Start with a safe non-zero fallback so the chart never renders "invisible" on first paint.
-  const [size, setSize] = useState<{ width: number; height: number }>({ width: 640, height: 260 });
-
-  // In some layouts (notably react-grid-layout), ResponsiveContainer's internal measurement can
-  // miss initial sizing. We measure the container ourselves and feed fixed numbers to Recharts.
-  useLayoutEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    const measure = () => {
-      const width = el.clientWidth;
-      const height = el.clientHeight;
-      if (width > 0 && height > 0) setSize({ width, height });
-    };
-
-    measure();
-
-    // Keep measuring until we see a real size (RGL can size after first paint).
-    // We cap the loop for safety, but this is long enough to cover slow layout.
-    let raf = 0;
-    let tries = 0;
-    const tick = () => {
-      tries += 1;
-      measure();
-      const hasRealSize = el.clientWidth > 0 && el.clientHeight > 0;
-      if (!hasRealSize && tries < 120) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-
-    const timeout = window.setTimeout(() => measure(), 50);
-
-    const ro = new ResizeObserver(() => measure());
-    ro.observe(el);
-    window.addEventListener('resize', measure);
-    return () => {
-      if (raf) cancelAnimationFrame(raf);
-      window.clearTimeout(timeout);
-      window.removeEventListener('resize', measure);
-      ro.disconnect();
-    };
-  }, []);
+  const { ref: containerRef, width, height } = useElementSize<HTMLDivElement>();
 
   const series = useMemo<TimePoint[]>(() => {
     if (!data) return [];
@@ -115,6 +93,81 @@ function ChartWidgetImpl({ id, settings }: ChartWidgetProps) {
     return buildPieSlices(series, 6);
   }, [series, settings.chartType]);
 
+  const exportPayload = useMemo(() => {
+    const filename = `chart_${sanitizeFilenamePart(settings.metric)}_${sanitizeFilenamePart(settings.chartType)}_${sanitizeFilenamePart(filters.dateRange)}_${sanitizeFilenamePart(filters.region)}_${sanitizeFilenamePart(filters.dataset)}.csv`;
+
+    if (settings.chartType === 'pie') {
+      const rows = pieSlices.map((p) => ({ name: p.name, value: p.value }));
+      return {
+        filename,
+        csvText: toCsv(rows, [
+          { key: 'name', header: 'name' },
+          { key: 'value', header: 'value' },
+        ]),
+        disabled: rows.length === 0,
+      };
+    }
+
+    const rows = series.map((p) => ({ label: p.date, value: p.value }));
+    return {
+      filename,
+      csvText: toCsv(rows, [
+        { key: 'label', header: 'label' },
+        { key: 'value', header: 'value' },
+      ]),
+      disabled: rows.length === 0,
+    };
+  }, [
+    filters.dataset,
+    filters.dateRange,
+    filters.region,
+    pieSlices,
+    series,
+    settings.chartType,
+    settings.metric,
+  ]);
+
+  const onExportCsv = useCallback(() => {
+    if (exportPayload.disabled) return;
+    downloadCsv(exportPayload.filename, exportPayload.csvText);
+  }, [exportPayload.csvText, exportPayload.disabled, exportPayload.filename]);
+
+  const isCompact = useMemo(() => {
+    // When the widget is small (or browser zoom makes the grid tighter),
+    // reduce chart chrome (legend, tick sizes) and shrink the pie.
+    return width < 420 || height < 260;
+  }, [height, width]);
+
+  const isTiny = useMemo(() => {
+    return width < 340 || height < 220;
+  }, [height, width]);
+
+  const axisFontSize = isCompact ? 10 : 12;
+
+  const pieLegendMode = useMemo<'right' | 'bottom' | 'none'>(() => {
+    if (settings.chartType !== 'pie') return 'none';
+    // On small widgets, a legend makes the chart unusable; hide it.
+    if (isTiny) return 'none';
+    // Prefer a vertical legend on the right when there's room; otherwise use a bottom legend.
+    if (width >= 680 && height >= 280) return 'right';
+    return 'bottom';
+  }, [height, isTiny, settings.chartType, width]);
+
+  const pieOuterRadius = useMemo(() => {
+    // Best-fit the pie into available space, accounting for legend placement.
+    const legendBottomH = pieLegendMode === 'bottom' ? Math.min(92, Math.round(height * 0.36)) : 0;
+    const legendRightW = pieLegendMode === 'right' ? Math.min(240, Math.round(width * 0.34)) : 0;
+
+    const availableW = Math.max(0, width - legendRightW);
+    const availableH = Math.max(0, height - legendBottomH);
+    const base = Math.min(availableW, availableH);
+
+    const mult = isCompact ? 0.28 : 0.34;
+    return Math.max(24, Math.min(160, Math.round(base * mult)));
+  }, [height, isCompact, pieLegendMode, width]);
+
+  const pieInnerRadius = Math.max(16, Math.round(pieOuterRadius * 0.55));
+
   const chartNode = useMemo(() => {
     if (series.length === 0) return null;
 
@@ -122,10 +175,10 @@ function ChartWidgetImpl({ id, settings }: ChartWidgetProps) {
       return (
         <LineChart data={series}>
           <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-          <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-          <YAxis tick={{ fontSize: 12 }} />
+          <XAxis dataKey="date" tick={{ fontSize: axisFontSize }} />
+          <YAxis tick={{ fontSize: axisFontSize }} />
           <Tooltip />
-          <Line type="monotone" dataKey="value" stroke={COLORS[0]} strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="value" stroke={PRIMARY_COLOR} strokeWidth={2} dot={false} />
         </LineChart>
       );
     }
@@ -134,10 +187,10 @@ function ChartWidgetImpl({ id, settings }: ChartWidgetProps) {
       return (
         <BarChart data={series}>
           <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-          <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-          <YAxis tick={{ fontSize: 12 }} />
+          <XAxis dataKey="date" tick={{ fontSize: axisFontSize }} />
+          <YAxis tick={{ fontSize: axisFontSize }} />
           <Tooltip />
-          <Bar dataKey="value" fill={COLORS[1]} radius={[4, 4, 0, 0]} />
+          <Bar dataKey="value" fill={PRIMARY_COLOR} radius={[4, 4, 0, 0]} />
         </BarChart>
       );
     }
@@ -146,23 +199,37 @@ function ChartWidgetImpl({ id, settings }: ChartWidgetProps) {
     return (
       <PieChart>
         <Tooltip />
-        <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 12 }} />
+        {pieLegendMode === 'right' ? (
+          <Legend
+            layout="vertical"
+            align="right"
+            verticalAlign="middle"
+            wrapperStyle={{ fontSize: isCompact ? 10 : 12, maxHeight: height - 8, overflowY: 'auto' }}
+          />
+        ) : pieLegendMode === 'bottom' ? (
+          <Legend
+            layout="horizontal"
+            align="center"
+            verticalAlign="bottom"
+            wrapperStyle={{ fontSize: isCompact ? 10 : 12, width: '100%', maxHeight: 88, overflowY: 'auto' }}
+          />
+        ) : null}
         <Pie
           data={pieSlices}
           dataKey="value"
           nameKey="name"
-          cx="40%"
-          cy="50%"
-          innerRadius={40}
-          outerRadius={80}
+          cx="50%"
+          cy={pieLegendMode === 'bottom' ? '46%' : '50%'}
+          innerRadius={pieInnerRadius}
+          outerRadius={pieOuterRadius}
         >
           {pieSlices.map((_, idx) => (
-            <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
+            <Cell key={idx} fill={idx === 0 ? PRIMARY_COLOR : PIE_COLORS[(idx - 1) % PIE_COLORS.length]} />
           ))}
         </Pie>
       </PieChart>
     );
-  }, [pieSlices, series, settings.chartType]);
+  }, [axisFontSize, height, isCompact, pieInnerRadius, pieLegendMode, pieOuterRadius, pieSlices, series, settings.chartType]);
 
   if (isLoading) return <Skeleton />;
   if (isError || !data) return <ErrorState />;
@@ -191,10 +258,20 @@ function ChartWidgetImpl({ id, settings }: ChartWidgetProps) {
           <option value="bar">Bar</option>
           <option value="pie">Pie</option>
         </select>
+
+        <button
+          type="button"
+          className="rounded-md border px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={onExportCsv}
+          disabled={exportPayload.disabled}
+          title="Export the currently displayed series as CSV"
+        >
+          Export CSV
+        </button>
       </div>
 
-      <div ref={containerRef} className="flex-1 min-h-[220px] min-w-0 w-full">
-        <ResponsiveContainer width={size.width} height={size.height}>
+      <div ref={containerRef} className="flex-1 min-h-0 min-w-0 w-full">
+        <ResponsiveContainer width="100%" height="100%">
           {chartNode ?? <div />}
         </ResponsiveContainer>
       </div>

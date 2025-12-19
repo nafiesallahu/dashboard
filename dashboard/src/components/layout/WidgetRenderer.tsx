@@ -1,9 +1,10 @@
 import { memo } from 'react';
 
 import { useDashboardStore, useWidgetById } from '../../store/dashboardStore';
-import type { ChartWidgetConfig, KpiWidgetConfig, TableWidgetConfig } from '../../store/types';
+import type { ChartWidgetConfig, FiltersWidgetConfig, KpiWidgetConfig, TableWidgetConfig } from '../../store/types';
 
 import { ChartWidget } from '../widgets/ChartWidget';
+import { FiltersWidget } from '../widgets/FiltersWidget';
 import { KpiWidget } from '../widgets/KpiWidget';
 import { TableWidget } from '../widgets/TableWidget';
 import { WidgetFrame } from './WidgetFrame';
@@ -12,6 +13,7 @@ const registry = {
   kpi: KpiWidget,
   chart: ChartWidget,
   table: TableWidget,
+  filters: FiltersWidget,
 } as const;
 
 function WidgetRendererImpl({ id }: { id: string }) {
@@ -39,6 +41,16 @@ function WidgetRendererImpl({ id }: { id: string }) {
     return (
       <WidgetFrame id={id} title={w.title} onHide={onHide}>
         <Component id={id} settings={w.settings} />
+      </WidgetFrame>
+    );
+  }
+
+  if (widget.type === 'filters') {
+    const Component = registry.filters;
+    const w: FiltersWidgetConfig = widget;
+    return (
+      <WidgetFrame id={id} title={w.title} onHide={onHide}>
+        <Component id={id} />
       </WidgetFrame>
     );
   }

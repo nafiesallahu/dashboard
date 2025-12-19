@@ -7,7 +7,9 @@ import { flexRender, getCoreRowModel, getPaginationRowModel, getSortedRowModel, 
 import { useDashboardData } from '../../hooks/useDashboardData';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { downloadCsv, toCsv } from '../../utils/csv';
+import { buildTablePdf, downloadPdf } from '../../utils/pdf';
 import { formatCurrency } from '../../utils/format';
+import { DatasetFilter } from '../filters/DatasetFilter';
 import { ErrorState } from '../shared/ErrorState';
 import { Skeleton } from '../shared/Skeleton';
 
@@ -29,6 +31,21 @@ function normalize(s: string) {
   return s.trim().toLowerCase();
 }
 
+function SortIcon({ state }: { state: false | 'asc' | 'desc' }) {
+  // Minimal, readable icon set:
+  // - unsorted: ⇅
+  // - asc: ▲
+  // - desc: ▼
+  const label = state === 'asc' ? 'Sorted ascending' : state === 'desc' ? 'Sorted descending' : 'Not sorted';
+  const glyph = state === 'asc' ? '▲' : state === 'desc' ? '▼' : '⇅';
+  const muted = state === false ? 'text-slate-400' : 'text-slate-700';
+  return (
+    <span className={`text-[10px] leading-none ${muted}`} aria-label={label}>
+      {glyph}
+    </span>
+  );
+}
+
 function TableWidgetImpl({ id, settings }: TableWidgetProps) {
   const filters = useDashboardStore((s) => s.filters);
   const updateWidgetSettings = useDashboardStore((s) => s.updateWidgetSettings);
@@ -48,12 +65,13 @@ function TableWidgetImpl({ id, settings }: TableWidgetProps) {
 
   const columns = useMemo<ColumnDef<TableRow>[]>(() => {
     return [
-      { accessorKey: 'name', header: 'Name', cell: (info) => info.getValue<string>() },
-      { accessorKey: 'email', header: 'Email', cell: (info) => info.getValue<string>() },
-      { accessorKey: 'country', header: 'Country', cell: (info) => info.getValue<string>() },
+      { accessorKey: 'name', header: 'Name', enableSorting: true, cell: (info) => info.getValue<string>() },
+      { accessorKey: 'email', header: 'Email', enableSorting: true, cell: (info) => info.getValue<string>() },
+      { accessorKey: 'country', header: 'Country', enableSorting: true, cell: (info) => info.getValue<string>() },
       {
         accessorKey: 'status',
         header: 'Status',
+        enableSorting: true,
         cell: (info) => {
           const v = info.getValue<'active' | 'inactive'>();
           return (
@@ -72,6 +90,7 @@ function TableWidgetImpl({ id, settings }: TableWidgetProps) {
       {
         accessorKey: 'sales',
         header: 'Sales',
+        enableSorting: true,
         cell: (info) => <span className="font-medium">{formatCurrency(info.getValue<number>())}</span>,
       },
     ];
@@ -88,6 +107,8 @@ function TableWidgetImpl({ id, settings }: TableWidgetProps) {
       pagination: { pageIndex, pageSize: settings.pageSize },
     },
     onSortingChange: setSorting,
+    enableSorting: true,
+    enableSortingRemoval: true,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -112,37 +133,66 @@ function TableWidgetImpl({ id, settings }: TableWidgetProps) {
     downloadCsv(`users-${filters.dateRange}-${filters.region}.csv`, csvText);
   };
 
-  return (
-    <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-3 pb-3">
-        <input
-          className="w-full max-w-xs rounded-md border bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
-          placeholder="Filter…"
-          value={settings.textFilter}
-          onChange={(e) => {
-            setPageIndex(0);
-            updateWidgetSettings({ id, type: 'table', patch: { textFilter: e.target.value } });
-          }}
-        />
+  const exportPdf = () => {
+    const sortedAll = table.getSortedRowModel().rows.map((r) => r.original);
+    const bytes = buildTablePdf<TableRow>({
+      title: `Users (${filters.dateRange}, ${filters.region.toUpperCase()}, ${filters.dataset})`,
+      columns: [
+        { key: 'name', header: 'Name' },
+        { key: 'email', header: 'Email' },
+        { key: 'country', header: 'Country' },
+        { key: 'status', header: 'Status' },
+        { key: 'sales', header: 'Sales' },
+      ],
+      rows: sortedAll,
+    });
+    downloadPdf(`users-${filters.dateRange}-${filters.region}-${filters.dataset}.pdf`, bytes);
+  };
 
-        <button
-          type="button"
-          className="rounded-md border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          onClick={exportCsv}
-        >
-          Export CSV
-        </button>
+  return (
+    <div className="flex h-full min-h-0 min-w-0 flex-col">
+      <div className="flex shrink-0 flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-3">
+            <DatasetFilter />
+            <input
+              className="w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 sm:max-w-xs"
+              placeholder="Filter…"
+              value={settings.textFilter}
+              onChange={(e) => {
+                setPageIndex(0);
+                updateWidgetSettings({ id, type: 'table', patch: { textFilter: e.target.value } });
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 sm:justify-end">
+          <button
+            type="button"
+            className="rounded-md border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            onClick={exportCsv}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className="rounded-md border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            onClick={exportPdf}
+          >
+            Export PDF
+          </button>
+        </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-lg border">
-        <table className="w-full border-collapse text-sm">
+      <div className="min-h-0 min-w-0 flex-1 overflow-auto rounded-lg border">
+        <table className="w-full min-w-0 border-collapse text-sm">
           <thead className="sticky top-0 bg-slate-50 text-xs font-medium uppercase tracking-wide text-slate-600">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id} className="border-b">
                 {hg.headers.map((h) => {
                   const canSort = h.column.getCanSort();
                   const sorted = h.column.getIsSorted();
-                  const indicator = sorted === 'asc' ? ' ▲' : sorted === 'desc' ? ' ▼' : '';
 
                   return (
                     <th key={h.id} className="px-3 py-2 text-left">
@@ -153,7 +203,7 @@ function TableWidgetImpl({ id, settings }: TableWidgetProps) {
                           onClick={h.column.getToggleSortingHandler()}
                         >
                           {flexRender(h.column.columnDef.header, h.getContext())}
-                          <span className="text-[10px]">{indicator}</span>
+                          <SortIcon state={sorted} />
                         </button>
                       ) : (
                         flexRender(h.column.columnDef.header, h.getContext())

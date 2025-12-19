@@ -17,7 +17,7 @@ export type FiltersState = {
 };
 
 // Widgets
-export type WidgetType = 'kpi' | 'chart' | 'table';
+export type WidgetType = 'kpi' | 'chart' | 'table' | 'filters';
 
 export type KpiMetric = 'totalSales' | 'activeUsers' | 'engagementRate';
 export type KpiSettings = { metric: KpiMetric };
@@ -27,6 +27,8 @@ export type ChartMetric = 'sales' | 'users' | 'engagement';
 export type ChartSettings = { chartType: ChartType; metric: ChartMetric };
 
 export type TableSettings = { pageSize: number; textFilter: string };
+
+export type FiltersWidgetSettings = Record<never, never>;
 
 export type WidgetBase = {
   id: string;
@@ -38,8 +40,9 @@ export type WidgetBase = {
 export type KpiWidgetConfig = WidgetBase & { type: 'kpi'; settings: KpiSettings };
 export type ChartWidgetConfig = WidgetBase & { type: 'chart'; settings: ChartSettings };
 export type TableWidgetConfig = WidgetBase & { type: 'table'; settings: TableSettings };
+export type FiltersWidgetConfig = WidgetBase & { type: 'filters'; settings: FiltersWidgetSettings };
 
-export type WidgetConfig = KpiWidgetConfig | ChartWidgetConfig | TableWidgetConfig;
+export type WidgetConfig = KpiWidgetConfig | ChartWidgetConfig | TableWidgetConfig | FiltersWidgetConfig;
 
 // Dashboard layouts + state
 export type DashboardLayouts = Partial<Record<Breakpoint, GridLayoutItem[]>>;
@@ -56,11 +59,13 @@ export type WidgetSettingsByType = {
   kpi: KpiSettings;
   chart: ChartSettings;
   table: TableSettings;
+  filters: FiltersWidgetSettings;
 };
 
 export type UpdateWidgetSettingsPayload =
   | { id: string; type: 'kpi'; patch: Partial<KpiSettings> }
   | { id: string; type: 'chart'; patch: Partial<ChartSettings> }
-  | { id: string; type: 'table'; patch: Partial<TableSettings> };
+  | { id: string; type: 'table'; patch: Partial<TableSettings> }
+  | { id: string; type: 'filters'; patch: Partial<FiltersWidgetSettings> };
 
 
