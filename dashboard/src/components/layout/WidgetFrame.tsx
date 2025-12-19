@@ -25,7 +25,6 @@ function WidgetFrameImpl({ title, onHide, children }: WidgetFrameProps) {
               className="h-4 w-4"
               fill="currentColor"
             >
-              {/* Move/drag icon (4-way arrows) */}
               <path d="M12 2l3.5 3.5-1.4 1.4L13 5.8V10h4.2l-1.1-1.1 1.4-1.4L22 12l-3.5 3.5-1.4-1.4 1.1-1.1H13v4.2l1.1-1.1 1.4 1.4L12 22l-3.5-3.5 1.4-1.4 1.1 1.1V13H6.8l1.1 1.1-1.4 1.4L2 12l3.5-3.5 1.4 1.4L5.8 10H11V5.8L9.9 6.9 8.5 5.5 12 2z" />
             </svg>
           </div>

@@ -39,14 +39,12 @@ function ensureLayoutHasItem(layout: GridLayoutItem[] | undefined, item: GridLay
   const arr = (layout ?? []).slice();
   const exists = arr.some((x) => x.i === item.i);
   if (exists) return arr;
-  // Put new widgets at the bottom for existing saved layouts to avoid overlapping user placements.
   return [...arr, { ...item, y: Number.POSITIVE_INFINITY }];
 }
 
 function getDefaultFiltersItem(bp: Breakpoint): GridLayoutItem {
   const fromDefaults = (DEFAULT_DASHBOARD_STATE.layouts[bp] ?? []).find((x) => x.i === 'filters_global');
   if (fromDefaults) return fromDefaults;
-  // Safe fallback (shouldn't happen unless defaults are edited incorrectly)
   if (bp === 'lg') return { i: 'filters_global', x: 0, y: 0, w: 12, h: 3 } as GridLayoutItem;
   if (bp === 'md') return { i: 'filters_global', x: 0, y: 0, w: 10, h: 3 } as GridLayoutItem;
   return { i: 'filters_global', x: 0, y: 0, w: 6, h: 4 } as GridLayoutItem;
@@ -68,10 +66,8 @@ function applyDefaultSizeToLayout(bp: Breakpoint, layout: GridLayoutItem[] | und
   const def = getDefaultLayoutItem(bp, id);
   if (!def) return (layout ?? []).slice();
 
-  // Ensure the item exists; if it's new for this saved layout, append at bottom to avoid overlaps.
   const ensured = ensureLayoutHasItem(layout, { ...def, y: Number.POSITIVE_INFINITY });
 
-  // Reset size constraints to defaults, but keep the user's last position (x/y) if it already existed.
   return ensured.map((item) => {
     if (item.i !== id) return item;
     return {
@@ -92,7 +88,6 @@ function initState(): Pick<StoreState, 'filters' | 'dashboard'> {
   const filters: FiltersState = persisted?.filters ? { ...DEFAULT_FILTERS, ...persisted.filters } : DEFAULT_FILTERS;
 
   const rawSavedLayouts = persisted?.dashboard?.layouts ?? DEFAULT_DASHBOARD_STATE.layouts;
-  // Ensure new widgets introduced in later versions (e.g. filters widget) get a default size/placement.
   const savedLayouts = mergeLayoutsWithDefaults(rawSavedLayouts);
   const savedWidgetsById = {
     ...DEFAULT_DASHBOARD_STATE.widgetsById,
@@ -153,7 +148,6 @@ export const useDashboardStore = create<StoreState>()(
           if (!current) return s;
           if (current.visible === visible) return s;
 
-          // When a widget is re-shown, reset it to the default size (per breakpoint).
           const nextDraftLayouts =
             !current.visible && visible
               ? {
@@ -246,7 +240,6 @@ export const useDashboardStore = create<StoreState>()(
   }),
 );
 
-// Persistence wiring (debounced) — filters only (dashboard persists only on Save Layout)
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function scheduleSaveFilters() {
   if (saveTimer) clearTimeout(saveTimer);
@@ -264,7 +257,6 @@ useDashboardStore.subscribe(
   },
 );
 
-// Small selector helpers (for component performance)
 export const useFilters = () => useDashboardStore((s) => s.filters);
 export const useFilterActions = () => useDashboardStore((s) => s.setFilter);
 export const useWidgetById = (id: string) => useDashboardStore((s) => s.dashboard.widgetsById[id]);

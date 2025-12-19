@@ -32,10 +32,7 @@ function normalize(s: string) {
 }
 
 function SortIcon({ state }: { state: false | 'asc' | 'desc' }) {
-  // Minimal, readable icon set:
-  // - unsorted: ⇅
-  // - asc: ▲
-  // - desc: ▼
+
   const label = state === 'asc' ? 'Sorted ascending' : state === 'desc' ? 'Sorted descending' : 'Not sorted';
   const glyph = state === 'asc' ? '▲' : state === 'desc' ? '▼' : '⇅';
   const muted = state === false ? 'text-slate-400' : 'text-slate-700';

@@ -22,30 +22,25 @@ export function ManageWidgetsMenu() {
     const btn = buttonRef.current;
     const menu = menuRef.current;
     if (!btn || !menu) return;
-    // Copy into narrowed variables so TS understands they're non-null inside nested functions.
     const btnEl = btn;
     const menuEl = menu;
 
-    const PADDING = 12; // keep a little breathing room from viewport edges
-    const GAP = 8; // space between button and dropdown
-    const IDEAL_W = 256; // matches w-64
+    const PADDING = 12; 
+    const GAP = 8;
+    const IDEAL_W = 256; 
 
     function layout() {
       const rect = btnEl.getBoundingClientRect();
       const vw = window.innerWidth;
       const vh = window.innerHeight;
 
-      // Width should never exceed the viewport minus padding.
       const width = Math.min(IDEAL_W, Math.max(180, vw - PADDING * 2));
 
-      // Align dropdown right edge with button right edge by default.
       const left = Math.min(vw - width - PADDING, Math.max(PADDING, rect.right - width));
 
-      // Default placement: below the button.
       let top = rect.bottom + GAP;
       let maxHeight = vh - top - PADDING;
 
-      // If it doesn't fit well below, place it above instead (when there's more room).
       const menuH = menuEl.offsetHeight || 0;
       const spaceBelow = vh - rect.bottom - PADDING - GAP;
       const spaceAbove = rect.top - PADDING - GAP;
@@ -67,7 +62,6 @@ export function ManageWidgetsMenu() {
 
     layout();
 
-    // Re-layout on viewport changes.
     window.addEventListener('resize', layout);
     window.addEventListener('scroll', layout, true);
     return () => {

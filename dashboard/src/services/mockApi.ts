@@ -23,10 +23,7 @@ export type DashboardData = {
   }>;
 };
 
-/**
- * Small deterministic RNG (LCG).
- * Same seed => same sequence across runs (no external libs).
- */
+
 function createRng(seed: number) {
   let state = seed >>> 0;
   return {
@@ -46,7 +43,6 @@ function createRng(seed: number) {
 }
 
 function hashSeed(input: string) {
-  // Simple, stable seed: weighted char codes (kept small and readable).
   let acc = 0;
   for (let i = 0; i < input.length; i += 1) {
     acc = (acc + input.charCodeAt(i) * (i + 1)) % 1_000_000_007;
@@ -107,27 +103,22 @@ export async function getDashboardData(filters: FiltersState): Promise<Dashboard
   const seed = hashSeed(`${filters.dateRange}|${filters.region}|${filters.dataset}`);
   const rng = createRng(seed);
 
-  // Deterministic delay (250–350ms), depends on seed => stable for same filters.
   const ms = 250 + (seed % 101);
   await delay(ms);
 
-  // Small multipliers so output changes with region/dataset while staying "reasonable".
   const regionMult =
     filters.region === 'us' ? 1.1 : filters.region === 'eu' ? 1.0 : filters.region === 'apac' ? 0.95 : 1.02;
   const datasetMult = filters.dataset === 'alt' ? 0.92 : 1.0;
   const mult = regionMult * datasetMult;
 
-  // Keep dates stable (not dependent on "today") so same filters always => same data.
   const anchorStart = new Date(Date.UTC(2025, 0, 1)); // 2025-01-01 UTC
 
   let dates: string[] = [];
   if (filters.dateRange === '30d') {
     dates = makeDailyPoints(anchorStart, 30);
   } else if (filters.dateRange === '90d') {
-    // 18 points every 5 days (consistent rule).
     dates = makeStepDaysPoints(anchorStart, 18, 5);
   } else {
-    // 365d -> 12 monthly points
     dates = makeMonthlyPoints(2025, 1, 12);
   }
 
@@ -136,7 +127,6 @@ export async function getDashboardData(filters: FiltersState): Promise<Dashboard
   const engagement: TimePoint[] = [];
 
   for (let i = 0; i < dates.length; i += 1) {
-    // Smooth-ish series with mild noise
     const t = i / Math.max(1, dates.length - 1);
     const wave = Math.sin(t * Math.PI * 2);
 
@@ -163,7 +153,7 @@ export async function getDashboardData(filters: FiltersState): Promise<Dashboard
   const lastNames = ['Kim', 'Patel', 'Garcia', 'Smith', 'Chen', 'Johnson', 'Wong', 'Brown', 'Martin', 'Singh'];
   const countries = ['US', 'DE', 'FR', 'GB', 'NG', 'JP', 'AU', 'BR', 'CA', 'SG'];
 
-  const rowCount = 18 + (seed % 13); // 18..30
+  const rowCount = 18 + (seed % 13); 
   const tableRows: DashboardData['tableRows'] = [];
   for (let i = 0; i < rowCount; i += 1) {
     const fn = firstNames[rng.int(0, firstNames.length - 1)];

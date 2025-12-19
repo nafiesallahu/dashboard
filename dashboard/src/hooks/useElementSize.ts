@@ -2,11 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 
 type Size = { width: number; height: number };
 
-/**
- * Lightweight element size observer with requestAnimationFrame throttling.
- * - No dependencies
- * - Avoids state updates when width/height didn't change
- */
+
 export function useElementSize<T extends HTMLElement>(): { ref: (el: T | null) => void; width: number; height: number } {
   const [node, setNode] = useState<T | null>(null);
   const rafId = useRef<number | null>(null);
@@ -28,7 +24,6 @@ export function useElementSize<T extends HTMLElement>(): { ref: (el: T | null) =
       setSize(last.current);
     };
 
-    // Initial measurement
     measure();
 
     const onResize = () => {

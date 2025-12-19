@@ -15,18 +15,13 @@ function isBreakpoint(value: string): value is Breakpoint {
 }
 
 export function DashboardGrid() {
-  /**
-   * React 19 + Zustand stability fix:
-   * - Select stable object reference (widgetsById) instead of deriving arrays inline.
-   * - Derive visibleIds in useMemo to avoid selector instability ("getSnapshot should be cached").
-   */
+
   const widgetsById = useDashboardStore((s) => s.dashboard.widgetsById);
   const draftLayouts = useDashboardStore((s) => s.dashboard.draftLayouts);
   const setDraftLayouts = useDashboardStore((s) => s.setDraftLayouts);
 
   const activeBreakpointRef = useRef<Breakpoint>('lg');
 
-  // Derive visibleIds from stable widgetsById reference
   const visibleIds = useMemo(
     () =>
       Object.values(widgetsById)
@@ -40,7 +35,6 @@ export function DashboardGrid() {
 
   const visibleLayouts = useMemo((): DashboardLayouts => {
     const filterItems = (items: GridLayoutItem[] | undefined) =>
-      // Clone items so RGL can mutate without mutating Zustand state by reference.
       (items ?? [])
         .filter((item) => visibleSet.has(item.i))
         .map((item) => ({ ...item }));
@@ -68,7 +62,6 @@ export function DashboardGrid() {
           activeBreakpointRef.current = bp;
         }}
         onDragStop={(layout) => {
-          // Important: only commit on stop events (avoid dispatching on every mouse move)
           setDraftLayouts(activeBreakpointRef.current, layout);
         }}
         onResizeStop={(layout) => {

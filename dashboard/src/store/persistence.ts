@@ -30,7 +30,6 @@ export function loadPersisted(): PersistedPayload | null {
 
     const result: PersistedPayload = {};
 
-    // filters: minimal shape validation (strings)
     const filters = parsed.filters;
     if (isRecord(filters)) {
       const dateRange = filters.dateRange;
@@ -41,7 +40,6 @@ export function loadPersisted(): PersistedPayload | null {
       }
     }
 
-    // dashboard: minimal shape validation (schemaVersion number, optional objects)
     const dashboard = parsed.dashboard;
     if (isRecord(dashboard)) {
       const schemaVersion = dashboard.schemaVersion;
@@ -59,11 +57,9 @@ export function loadPersisted(): PersistedPayload | null {
             widgetsById: (widgetsById ?? undefined) as DashboardState['widgetsById'],
           };
         } else {
-          // Version mismatch: ignore dashboard but still allow filters.
           result.dashboard = undefined;
         }
       } else {
-        // Bad shape: consider this a hard failure.
         return null;
       }
     }

@@ -1,6 +1,5 @@
 import type { Layout } from 'react-grid-layout';
 
-// Breakpoints + RGL types
 export type Breakpoint = 'lg' | 'md' | 'sm';
 
 export type GridLayoutItem = Layout;

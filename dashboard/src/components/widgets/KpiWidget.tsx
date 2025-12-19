@@ -36,8 +36,7 @@ function KpiWidgetImpl({ settings }: KpiWidgetProps) {
   }, [data, settings.metric]);
 
   const valueStyle = useMemo(() => {
-    // Scale based on *container size* (not viewport). Keep it smooth using CSS clamp().
-    // We prefer width-driven scaling, but cap by height so it doesn't overflow short cards.
+  
     const preferredPx = Math.min(width * 0.14, height * 0.42);
     return {
       fontSize: `clamp(28px, ${Math.max(0, preferredPx).toFixed(1)}px, 64px)`,

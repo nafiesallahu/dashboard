@@ -4,7 +4,6 @@ import { useDashboardStore } from '../store/dashboardStore';
 import logoIcon from '../assets/picsvg_download.svg'
 
 function DashboardPage() {
-  // TODO: page-level orchestration: fetch data, wire filters, render grid.
   return (
     <div className="space-y-4">
       <DashboardGrid />
@@ -21,7 +20,6 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-gray-900">
       <header className="border-b bg-white">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
-          {/* Desktop: All in one row with space-between */}
           <div className="hidden min-w-0 items-center justify-between gap-2 sm:flex">
             <img
               src={logoIcon}
@@ -54,9 +52,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Mobile: Icon + Manage Widgets on row 1, Save/Discard/Unsaved on row 2 */}
           <div className="flex min-w-0 flex-col gap-3 sm:hidden">
-            {/* Row 1: Icon and Manage Widgets - inline with space-between */}
             <div className="flex min-w-0 items-center justify-between gap-2">
               <img
                 src={logoIcon}
@@ -66,7 +62,6 @@ export default function App() {
               <ManageWidgetsMenu />
             </div>
 
-            {/* Row 2: Unsaved changes, Discard, Save Layout - only when isDirty, inline, aligned right */}
             {isDirty ? (
               <div className="flex items-center justify-end gap-2">
                 <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">

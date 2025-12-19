@@ -8,27 +8,19 @@ function toText(value: unknown) {
   return String(value);
 }
 
-/**
- * Very small PDF generator (text-only) with built-in Helvetica font.
- * - No external dependencies
- * - Good enough for exporting simple tables
- */
+
 export function buildTablePdf<T extends Record<string, unknown>>(input: {
   title: string;
   columns: Array<{
     key: keyof T;
     header: string;
-    /**
-     * Relative width weight (not points). Example: 3 means "3x as wide" as a column with width 1.
-     * If omitted, defaults to 1.
-     */
+   
     width?: number;
-    /** Horizontal alignment for header + cells. */
     align?: 'left' | 'center' | 'right';
   }>;
   rows: T[];
 }): Uint8Array {
-  const pageW = 595; // A4 points
+  const pageW = 595; 
   const pageH = 842;
 
   const marginX = 40;
@@ -83,12 +75,11 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
       return xs;
     },
     [marginX],
-  ); // length = columns+1
+  ); 
 
   const lines: string[] = [];
   const pushLine = (s: string) => lines.push(s);
 
-  // Collect per-page content streams (each is an array of text drawing ops)
   const pages: string[] = [];
 
   function startPage() {
@@ -107,21 +98,20 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
     const safe = escapePdfText(text);
     if (sizeOverride) pushLine(`/F1 ${sizeOverride} Tf`);
     pushLine(`${x.toFixed(2)} ${y.toFixed(2)} Td (${safe}) Tj`);
-    // Reset font if overridden
     if (sizeOverride) pushLine(`/F1 ${fontSize} Tf`);
   }
 
   function drawRect(x: number, y: number, w: number, h: number, fill?: string) {
-    pushLine('ET'); // End text mode
-    pushLine(`${borderWidth} w`); // Set line width
+    pushLine('ET'); 
+    pushLine(`${borderWidth} w`); 
     if (fill) {
-      pushLine(fill + ' rg'); // Set fill color
+      pushLine(fill + ' rg'); 
       pushLine(`${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re f`);
-      pushLine('0 0 0 rg'); // Reset to black
+      pushLine('0 0 0 rg'); 
     }
-    pushLine('0 0 0 RG'); // Set stroke color to black
-    pushLine(`${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re S`); // Draw rectangle border
-    pushLine('BT'); // Back to text mode
+    pushLine('0 0 0 RG');
+    pushLine(`${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re S`); 
+    pushLine('BT'); 
     pushLine(`/F1 ${fontSize} Tf`);
   }
 
@@ -134,7 +124,6 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
     const breakChars = new Set([' ', '/', '-', '_', '@', '.']);
     while (rest.length > maxChars) {
       let cut = maxChars;
-      // Prefer breaking on a "nice" boundary within range.
       for (let j = maxChars; j >= Math.max(1, Math.floor(maxChars * 0.55)); j -= 1) {
         const ch = rest[j - 1];
         if (breakChars.has(ch)) {
@@ -157,11 +146,9 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
     return out;
   }
 
-  // Basic heuristic: ~ (colW / fontSize) * 1.8 chars for Helvetica at small sizes.
   const maxCharsPerCol = colWs.map((w) => Math.max(8, Math.floor((w / fontSize) * 1.8)));
 
   function estimateTextW(text: string, size: number) {
-    // Helvetica average glyph width is roughly ~0.52em for typical ASCII-ish content.
     return text.length * size * 0.52;
   }
 
@@ -184,7 +171,6 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
   }
 
   function textAtBold(x: number, y: number, text: string, sizeOverride?: number) {
-    // Simulate "bold" by drawing the same text twice with a tiny horizontal offset.
     pushLine('1 0 0 1 0 0 Tm');
     textAt(x, y, text, sizeOverride);
     pushLine('1 0 0 1 0 0 Tm');
@@ -195,10 +181,8 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
     const headerRowH = lineH + cellPadding * 2;
     const headerY = yTop - headerRowH;
 
-    // Background + border
     drawRect(marginX, headerY, usableW, headerRowH, '0.92 0.92 0.92');
 
-    // Column separators
     pushLine('ET');
     pushLine(`${borderWidth} w`);
     pushLine('0 0 0 RG');
@@ -209,7 +193,6 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
     pushLine('BT');
     pushLine(`/F1 ${fontSize} Tf`);
 
-    // Header labels
     for (let c = 0; c < columns.length; c += 1) {
       const col = columns[c];
       const x = cellTextX({ colIdx: c, text: col.header, fontSize: fontSizeHeader });
@@ -223,12 +206,10 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
   startPage();
   let y = pageH - marginTop;
 
-  // Title
-  pushLine('1 0 0 1 0 0 Tm'); // reset text matrix
+  pushLine('1 0 0 1 0 0 Tm'); 
   textAt(marginX, y, input.title, fontSizeTitle);
   y -= lineH * 2.2;
 
-  // Header row with table structure (repeat on each page)
   const firstHeader = drawHeaderRow(y);
   y = firstHeader.headerY;
 
@@ -243,9 +224,7 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
     }
   }
 
-  // Rows with table structure
   for (const row of input.rows) {
-    // Wrap each cell then use the max wrapped lines as the row height.
     const wrapped = columns.map((col, idx) =>
       wrapCellText(toText(row[col.key]), maxCharsPerCol[idx] ?? 12),
     );
@@ -254,11 +233,9 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
 
     ensureRoom(Math.ceil(rowH / lineH) + 1);
 
-    // Draw row cell borders (outer rectangle)
     const rowY = y - rowH;
     drawRect(marginX, rowY, usableW, rowH);
     
-    // Draw vertical borders between cells
     pushLine('ET');
     pushLine(`${borderWidth} w`);
     pushLine('0 0 0 RG');
@@ -269,7 +246,6 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
     pushLine('BT');
     pushLine(`/F1 ${fontSize} Tf`);
 
-    // Draw row text content
     for (let l = 0; l < rowLines; l += 1) {
       pushLine('1 0 0 1 0 0 Tm');
       for (let c = 0; c < columns.length; c += 1) {
@@ -285,9 +261,6 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
 
   endPage();
 
-  // ---- Build PDF objects (minimal) ----
-  // Object IDs:
-  // 1: catalog, 2: pages, 3: font, then for each page: pageObj + contentObj
   const objects: string[] = [];
   const offsets: number[] = [];
 
@@ -295,36 +268,31 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
     objects.push(body);
   };
 
-  // Font (Helvetica)
   addObj(`<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>`);
 
-  // We will fill pages & catalog after we know page object ids.
   const pageObjects: Array<{ page: string; content: string }> = pages.map((contentStream) => {
     const stream = contentStream;
     const len = new TextEncoder().encode(stream).length;
     return {
       content: `<< /Length ${len} >>\nstream\n${stream}\nendstream`,
-      page: '', // placeholder
+      page: '', 
     };
   });
 
-  const firstPageObjId = 4; // 1:catalog,2:pages,3:font
+  const firstPageObjId = 4; 
   const pageCount = pageObjects.length;
   const pageObjIds = Array.from({ length: pageCount }, (_, i) => firstPageObjId + i * 2);
   const contentObjIds = Array.from({ length: pageCount }, (_, i) => firstPageObjId + i * 2 + 1);
 
-  // Pages object (2)
   const kids = pageObjIds.map((id) => `${id} 0 R`).join(' ');
   const pagesObj = `<< /Type /Pages /Count ${pageCount} /Kids [ ${kids} ] >>`;
 
-  // Catalog (1)
   const catalogObj = `<< /Type /Catalog /Pages 2 0 R >>`;
 
-  // Now build full object list in order: 1..N
   const allObjects: string[] = [];
-  allObjects[0] = catalogObj; // 1
-  allObjects[1] = pagesObj; // 2
-  allObjects[2] = objects[0]; // 3 font
+  allObjects[0] = catalogObj; 
+  allObjects[1] = pagesObj; 
+  allObjects[2] = objects[0]; 
 
   for (let i = 0; i < pageCount; i += 1) {
     const pageObj = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentObjIds[i]} 0 R >>`;
@@ -334,7 +302,6 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
 
   let out = '%PDF-1.3\n';
 
-  // Write objects and record offsets
   for (let i = 0; i < allObjects.length; i += 1) {
     const objBody = allObjects[i];
     if (!objBody) continue;
@@ -357,7 +324,6 @@ export function buildTablePdf<T extends Record<string, unknown>>(input: {
 }
 
 export function downloadPdf(filename: string, bytes: Uint8Array) {
-  // Copy into a fresh ArrayBuffer to avoid SharedArrayBuffer typing issues in TS DOM libs.
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
   const blob = new Blob([copy.buffer], { type: 'application/pdf' });

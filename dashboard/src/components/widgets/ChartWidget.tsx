@@ -32,7 +32,6 @@ export type ChartWidgetProps = {
 type TimePoint = { date: string; value: number };
 
 const PRIMARY_COLOR = '#5101a7';
-// Color palette for pie chart (only first slice uses PRIMARY_COLOR, others use these)
 const PIE_COLORS = [
   '#06b6d4', // cyan
   '#22c55e', // green
@@ -54,7 +53,6 @@ function buildPieSlices(series: TimePoint[], topN = 6): PieSlice[] {
 }
 
 function sanitizeFilenamePart(value: string): string {
-  // Keep it simple + consistent: replace whitespace with "_" and avoid weird filesystem characters.
   return value
     .trim()
     .replace(/\s+/g, '_')
@@ -133,8 +131,7 @@ function ChartWidgetImpl({ id, settings }: ChartWidgetProps) {
   }, [exportPayload.csvText, exportPayload.disabled, exportPayload.filename]);
 
   const isCompact = useMemo(() => {
-    // When the widget is small (or browser zoom makes the grid tighter),
-    // reduce chart chrome (legend, tick sizes) and shrink the pie.
+  
     return width < 420 || height < 260;
   }, [height, width]);
 
@@ -146,7 +143,6 @@ function ChartWidgetImpl({ id, settings }: ChartWidgetProps) {
 
   const pieLegendMode = useMemo<'right' | 'bottom' | 'none'>(() => {
     if (settings.chartType !== 'pie') return 'none';
-    // On small widgets, a legend makes the chart unusable; hide it.
     if (isTiny) return 'none';
     // Prefer a vertical legend on the right when there's room; otherwise use a bottom legend.
     if (width >= 680 && height >= 280) return 'right';
@@ -154,7 +150,6 @@ function ChartWidgetImpl({ id, settings }: ChartWidgetProps) {
   }, [height, isTiny, settings.chartType, width]);
 
   const pieOuterRadius = useMemo(() => {
-    // Best-fit the pie into available space, accounting for legend placement.
     const legendBottomH = pieLegendMode === 'bottom' ? Math.min(92, Math.round(height * 0.36)) : 0;
     const legendRightW = pieLegendMode === 'right' ? Math.min(240, Math.round(width * 0.34)) : 0;
 
@@ -195,7 +190,6 @@ function ChartWidgetImpl({ id, settings }: ChartWidgetProps) {
       );
     }
 
-    // pie - center the pie in the widget
     return (
       <PieChart>
         <Tooltip />
